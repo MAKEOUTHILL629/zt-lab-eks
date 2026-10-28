@@ -100,6 +100,8 @@ cmd_desplegar() { # c0|c1
   fi
 
   # --- C1: modelo completo ---
+  # los espacios de nombres deben existir antes de crear el ConfigMap destinos.
+  aplicar "$RAIZ/k8s/base/00-namespaces.yaml"
   # destinos temporal para que los pods arranquen antes de conocer los dominios.
   kubectl create configmap destinos -n tienda \
     --from-literal=CATALOGO_URL="http://catalogo.tienda.svc.cluster.local:8080" \
