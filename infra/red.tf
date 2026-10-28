@@ -55,3 +55,10 @@ resource "aws_route53_zone" "interna" {
     ignore_changes = [vpc]
   }
 }
+
+# Red de servicios de VPC Lattice (sección 7.2.3). El controlador (v2) no la crea: debe
+# existir antes que el Gateway, cuyo nombre es el de la red (k8s/modelo/00-gateway.yaml).
+# La asociación con la VPC y la política de autenticación las gestiona el controlador.
+resource "aws_vpclattice_service_network" "red" {
+  name = "zt-red-servicios"
+}
