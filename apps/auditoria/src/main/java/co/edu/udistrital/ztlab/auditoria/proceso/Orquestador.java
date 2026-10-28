@@ -59,7 +59,7 @@ public class Orquestador {
     ingesta = fuente.flujo()
         .doOnNext(m -> metricas.contarEvento())
         .publishOn(hilo)
-        .doOnNext(this::ingerir)
+        .doOnNext(m -> metricas.procesamientoTimer().record(() -> ingerir(m)))
         .subscribe();
 
     cierre = Flux.interval(Duration.ofSeconds(10))

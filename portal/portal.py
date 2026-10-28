@@ -5,6 +5,7 @@ Proceso de llegadas de Poisson con media ZT_TASA solicitudes/segundo:
   catálogo y clientes y un pago), 10 % consulta de pedido.
 En C1 (ZT_MODO=c1) firma cada solicitud con SigV4; en C0 llama por HTTP plano.
 """
+import json
 import os
 import random
 import sys
@@ -35,7 +36,15 @@ def intervalo(azar):
     return azar.expovariate(TASA)
 
 
+def registrar_latencia(accion, ms, estado):
+    """Una línea JSON por solicitud en la salida estándar (latencia Este-Oeste del cliente)."""
+    print(json.dumps({"ts": time.time(), "modo": MODO, "accion": accion,
+                      "ms": round(ms, 2), "estado": estado}), flush=True)
+
+
 def _ejecutar(accion, azar):
+    inicio = time.perf_counter()
+    estado = "ok"
     try:
         if accion == "ver_catalogo":
             solicitud("GET", DESTINOS["catalogo"] + "/productos", firmar=FIRMAR, verify=False)
@@ -46,8 +55,9 @@ def _ejecutar(accion, azar):
         else:
             solicitud("GET", DESTINOS["pedidos"] + "/pedidos/" + str(azar.randint(1, 50)),
                       firmar=FIRMAR, verify=False)
-    except Exception:  # noqa: BLE001  el portal no debe caerse por un error puntual
-        pass
+    except Exception as error:  # noqa: BLE001  el portal no debe caerse por un error puntual
+        estado = type(error).__name__
+    registrar_latencia(accion, (time.perf_counter() - inicio) * 1000.0, estado)
 
 
 def main(semilla=0):

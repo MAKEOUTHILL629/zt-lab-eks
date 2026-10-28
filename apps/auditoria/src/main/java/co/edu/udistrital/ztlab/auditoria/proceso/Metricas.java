@@ -26,6 +26,7 @@ public class Metricas {
   private final Counter tardios;
   private final Counter muestreadas;
   private final Timer puntuacion;
+  private final Timer procesamiento;
   private final DistributionSummary duracion;
   private final ConcurrentHashMap<String, Estado> estados = new ConcurrentHashMap<>();
 
@@ -35,6 +36,8 @@ public class Metricas {
     this.tardios = Counter.builder("zt.ingesta.tardios").register(registro);
     this.muestreadas = Counter.builder("zt.ingesta.muestreadas").register(registro);
     this.puntuacion = Timer.builder("zt.puntuacion.latencia")
+        .publishPercentileHistogram().register(registro);
+    this.procesamiento = Timer.builder("zt.procesamiento.evento")
         .publishPercentileHistogram().register(registro);
     this.duracion = DistributionSummary.builder("zt.lattice.duracion")
         .baseUnit("ms").publishPercentileHistogram().register(registro);
@@ -47,6 +50,9 @@ public class Metricas {
   public void contarMuestreada() { muestreadas.increment(); }
 
   public Timer puntuacionTimer() { return puntuacion; }
+
+  /** Latencia interna del paso de un evento por la canalización (normalizar y agregar). */
+  public Timer procesamientoTimer() { return procesamiento; }
 
   public double totalEventos() { return eventos.count(); }
 

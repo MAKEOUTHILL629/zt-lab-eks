@@ -24,6 +24,23 @@ jobs:
       - name: Compilar y ejecutar las pruebas (JUnit 5, Mockito, StepVerifier)
         working-directory: apps
         run: mvn -B verify
+      - name: Resumen de pruebas y cobertura de líneas (JaCoCo)
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import csv, glob, re
+          pruebas = fallos = 0
+          for f in glob.glob('apps/*/target/surefire-reports/*.txt'):
+              m = re.search(r'Tests run: (\d+), Failures: (\d+), Errors: (\d+)', open(f).read())
+              if m:
+                  pruebas += int(m[1]); fallos += int(m[2]) + int(m[3])
+          cubiertas = perdidas = 0
+          for f in glob.glob('apps/*/target/site/jacoco/jacoco.csv'):
+              for fila in csv.DictReader(open(f)):
+                  cubiertas += int(fila['LINE_COVERED']); perdidas += int(fila['LINE_MISSED'])
+          total = cubiertas + perdidas
+          print(f"Pruebas: {pruebas}, fallidas: {fallos}")
+          print(f"Cobertura de líneas: {100.0 * cubiertas / total:.1f} % ({cubiertas}/{total})" if total else "Sin datos de cobertura")
+          PY
       - name: Análisis de dependencias de la solicitud de cambio
         if: github.event_name == 'pull_request'
         uses: actions/dependency-review-action@v5
