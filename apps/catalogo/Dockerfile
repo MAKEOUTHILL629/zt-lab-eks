@@ -6,7 +6,7 @@ FROM eclipse-temurin:17-jre
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl \
  && rm -rf /var/lib/apt/lists/* \
- && useradd -r -u 1000 app \
+ && (getent passwd 1000 || useradd -r -u 1000 app) \
  && mkdir -p /app
 COPY target/catalogo-1.0.0.jar /app/app.jar
 USER 1000
