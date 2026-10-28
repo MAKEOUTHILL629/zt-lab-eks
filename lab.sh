@@ -66,11 +66,41 @@ id_servicio_pagos() {
     --query "items[?name=='pagos-tienda'].id | [0]" --output text
 }
 
+# En modo estricto de políticas de red CoreDNS queda aislado y su complemento no
+# alcanza el estado activo; la política de la plataforma solo llega después de la
+# infraestructura. Mientras tofu espera, se aplica aquí la de kube-system.
+permitir_kube_system() { # pid de tofu apply
+  local pid="$1" cluster region
+  cluster="$($TOFU output -raw nombre_cluster 2>/dev/null)" || cluster="zt-lab"
+  region="$($TOFU output -raw region 2>/dev/null)" || region="${AWS_REGION:-us-east-1}"
+  while kill -0 "$pid" 2>/dev/null; do
+    if aws eks update-kubeconfig --name "$cluster" --region "$region" >/dev/null 2>&1        && kubectl apply -f - >/dev/null 2>&1 <<'POL'
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: permitir-todo
+  namespace: kube-system
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress: [{}]
+  egress: [{}]
+POL
+    then
+      echo ">> Política permitir-todo aplicada en kube-system (CoreDNS)."; return 0
+    fi
+    sleep 15
+  done
+}
+
 cmd_infra() {
-  tiene "$TOFU"; tiene git
+  tiene "$TOFU"; tiene git; tiene aws; tiene kubectl
   pushd "$RAIZ/infra" >/dev/null
   $TOFU init -input=false
-  $TOFU apply -auto-approve
+  $TOFU apply -auto-approve &
+  local pid=$!
+  permitir_kube_system "$pid" || true
+  wait "$pid"
   popd >/dev/null
 }
 
@@ -139,6 +169,16 @@ cmd_politicas() {
   popd >/dev/null
 }
 
+borrar_cname_pagos() {
+  local zona nombre reg
+  zona="$(cd "$RAIZ/infra" && $TOFU output -raw zona_privada_id 2>/dev/null)" || return 0
+  nombre="pagos.$(cd "$RAIZ/infra" && $TOFU output -raw zona_privada_nombre 2>/dev/null)"
+  reg="$(aws route53 list-resource-record-sets --hosted-zone-id "$zona"     --query "ResourceRecordSets[?Type=='CNAME' && Name=='${nombre}']|[0]" --output json 2>/dev/null)" || return 0
+  [ -n "$reg" ] && [ "$reg" != "null" ] || return 0
+  echo ">> Eliminando CNAME residual $nombre"
+  aws route53 change-resource-record-sets --hosted-zone-id "$zona"     --change-batch "{\"Changes\":[{\"Action\":\"DELETE\",\"ResourceRecordSet\":$reg}]}" || true
+}
+
 cmd_destruir() {
   tiene kubectl; tiene "$TOFU"
   cargar_salidas || true
@@ -150,6 +190,9 @@ cmd_destruir() {
   if [ -d "$RAIZ/politicas/.terraform" ]; then
     (cd "$RAIZ/politicas" && $TOFU destroy -auto-approve) || true
   fi
+  # Si el destroy de politicas falla (sus fuentes de datos ya no resuelven), el CNAME
+  # de pagos queda y bloquea la zona privada: se elimina directamente.
+  borrar_cname_pagos
   (cd "$RAIZ/infra" && $TOFU destroy -auto-approve)
 }
 
