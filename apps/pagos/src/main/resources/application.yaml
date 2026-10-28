@@ -1,0 +1,41 @@
+# Perfil base (= línea base C0): HTTP plano en 8080.
+spring:
+  application:
+    name: pagos
+server:
+  port: 8080
+management:
+  server:
+    port: 8081
+    ssl:
+      enabled: false # métricas sin TLS, solo desde observabilidad
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+        add-additional-paths: true
+---
+# Perfil C1 (modelo): servidor mTLS en 8443; el handshake exige certificado de cliente.
+spring:
+  config:
+    activate:
+      on-profile: c1
+  ssl:
+    bundle:
+      pem:
+        servidor:
+          reload-on-update: true # recarga el material al renovarlo cert-manager
+          keystore:
+            certificate: file:/etc/tls/tls.crt
+            private-key: file:/etc/tls/tls.key
+          truststore:
+            certificate: file:/etc/tls/ca.crt
+server:
+  port: 8443
+  ssl:
+    bundle: servidor
+    client-auth: need

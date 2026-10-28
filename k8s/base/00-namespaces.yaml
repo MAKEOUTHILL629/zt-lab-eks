@@ -1,0 +1,17 @@
+# Espacios de nombres de la aplicación de laboratorio (sección 7.2.4).
+# La etiqueta kubernetes.io/metadata.name la añade Kubernetes automáticamente y la
+# usan las políticas de red (b5) como namespaceSelector.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tienda
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: auditoria
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observabilidad

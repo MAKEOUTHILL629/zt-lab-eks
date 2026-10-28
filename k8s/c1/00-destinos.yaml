@@ -1,0 +1,14 @@
+# Configuración C1: los servicios se comunican a través de VPC Lattice. Los dominios de
+# catalogo, clientes y pedidos (modo A) los asigna el controlador y lab.sh los exporta
+# desde la anotación lattice-assigned-domain-name. Pagos usa el dominio personalizado
+# del modo B (paso directo TLS).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: destinos
+  namespace: tienda
+data:
+  CATALOGO_URL: "https://${DOMINIO_CATALOGO}"
+  CLIENTES_URL: "https://${DOMINIO_CLIENTES}"
+  PEDIDOS_URL: "https://${DOMINIO_PEDIDOS}"
+  PAGOS_URL: "https://pagos.zt-lab.internal:8443"

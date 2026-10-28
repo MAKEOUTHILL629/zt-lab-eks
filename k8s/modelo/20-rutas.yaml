@@ -1,0 +1,103 @@
+# Rutas de VPC Lattice y políticas de grupo de destinos (Anexo B, {lst:b_rutas}).
+# Modo A (catalogo, clientes, pedidos): una HTTPRoute por servicio; VPC Lattice reenvía
+# al pod por HTTPS (TargetGroupPolicy con protocolo HTTPS y verificación en /readyz).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: { name: catalogo, namespace: tienda }
+spec:
+  parentRefs:
+    - { name: zt-red-servicios, sectionName: https }
+  rules:
+    - backendRefs:
+        - { name: catalogo, kind: Service, port: 8443 }
+---
+apiVersion: application-networking.k8s.aws/v1alpha1
+kind: TargetGroupPolicy
+metadata: { name: catalogo-destinos, namespace: tienda }
+spec:
+  targetRef: { group: "", kind: Service, name: catalogo }
+  protocol: HTTPS
+  protocolVersion: HTTP1
+  healthCheck:
+    enabled: true
+    protocol: HTTPS
+    protocolVersion: HTTP1
+    port: 8443
+    path: /readyz
+    intervalSeconds: 10
+    timeoutSeconds: 2
+    healthyThresholdCount: 3
+    unhealthyThresholdCount: 2
+    statusMatch: "200"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: { name: clientes, namespace: tienda }
+spec:
+  parentRefs:
+    - { name: zt-red-servicios, sectionName: https }
+  rules:
+    - backendRefs:
+        - { name: clientes, kind: Service, port: 8443 }
+---
+apiVersion: application-networking.k8s.aws/v1alpha1
+kind: TargetGroupPolicy
+metadata: { name: clientes-destinos, namespace: tienda }
+spec:
+  targetRef: { group: "", kind: Service, name: clientes }
+  protocol: HTTPS
+  protocolVersion: HTTP1
+  healthCheck:
+    enabled: true
+    protocol: HTTPS
+    protocolVersion: HTTP1
+    port: 8443
+    path: /readyz
+    intervalSeconds: 10
+    timeoutSeconds: 2
+    healthyThresholdCount: 3
+    unhealthyThresholdCount: 2
+    statusMatch: "200"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: { name: pedidos, namespace: tienda }
+spec:
+  parentRefs:
+    - { name: zt-red-servicios, sectionName: https }
+  rules:
+    - backendRefs:
+        - { name: pedidos, kind: Service, port: 8443 }
+---
+apiVersion: application-networking.k8s.aws/v1alpha1
+kind: TargetGroupPolicy
+metadata: { name: pedidos-destinos, namespace: tienda }
+spec:
+  targetRef: { group: "", kind: Service, name: pedidos }
+  protocol: HTTPS
+  protocolVersion: HTTP1
+  healthCheck:
+    enabled: true
+    protocol: HTTPS
+    protocolVersion: HTTP1
+    port: 8443
+    path: /readyz
+    intervalSeconds: 10
+    timeoutSeconds: 2
+    healthyThresholdCount: 3
+    unhealthyThresholdCount: 2
+    statusMatch: "200"
+---
+# Modo B: paso directo TLS hacia pagos con dominio personalizado (SNI). El registro
+# CNAME pagos.zt-lab.internal (etapa politicas/) apunta al dominio que publica la
+# anotación application-networking.k8s.aws/lattice-assigned-domain-name.
+apiVersion: gateway.networking.k8s.io/v1
+kind: TLSRoute
+metadata: { name: pagos, namespace: tienda }
+spec:
+  hostnames: ["pagos.zt-lab.internal"]
+  parentRefs:
+    - { name: zt-red-servicios, sectionName: tls }
+  rules:
+    - backendRefs:
+        - { name: pagos, kind: Service, port: 8443 }

@@ -1,0 +1,17 @@
+# La línea base C0 no tiene políticas de red del modelo. Pero el complemento Amazon VPC
+# CNI se despliega en modo estricto desde la etapa infra, que impone denegación por
+# defecto a TODO pod. Para que C0 represente la comunicación sin restricciones, se
+# aplica una política que permite toda entrada y salida en el espacio tienda.
+# (En C1 esta política NO se aplica; en su lugar rigen las de k8s/modelo.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sin-restricciones
+  namespace: tienda
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - {}
+  egress:
+    - {}

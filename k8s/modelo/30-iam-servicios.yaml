@@ -1,0 +1,107 @@
+# Políticas de autenticación de cada servicio, segundo nivel (Anexo C, {lst:c_servicio};
+# la de clientes es la {lst:iam_clientes} de la sección 7.2.5). Cada declaración es una
+# celda permitida de la matriz de autorización ({tab:autorizacion}); lo no declarado se
+# deniega. La condición sobre kubernetes-service-account verifica la identidad de origen.
+apiVersion: application-networking.k8s.aws/v1alpha1
+kind: IAMAuthPolicy
+metadata:
+  name: catalogo-politica
+  namespace: tienda
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: catalogo
+  policy: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        { "Sid": "PortalConsultaCatalogo", "Effect": "Allow",
+          "Principal": { "AWS": "arn:aws:iam::${CUENTA}:root" },
+          "Action": "vpc-lattice-svcs:Invoke", "Resource": "*",
+          "Condition": {
+            "StringEquals": {
+              "aws:PrincipalTag/eks-cluster-name": "zt-lab",
+              "aws:PrincipalTag/kubernetes-namespace": "tienda",
+              "aws:PrincipalTag/kubernetes-service-account": "portal",
+              "vpc-lattice-svcs:RequestMethod": "GET" },
+            "StringLike": { "vpc-lattice-svcs:RequestPath": "/productos*" } } },
+        { "Sid": "PedidosConsultaProducto", "Effect": "Allow",
+          "Principal": { "AWS": "arn:aws:iam::${CUENTA}:root" },
+          "Action": "vpc-lattice-svcs:Invoke", "Resource": "*",
+          "Condition": {
+            "StringEquals": {
+              "aws:PrincipalTag/eks-cluster-name": "zt-lab",
+              "aws:PrincipalTag/kubernetes-namespace": "tienda",
+              "aws:PrincipalTag/kubernetes-service-account": "pedidos",
+              "vpc-lattice-svcs:RequestMethod": "GET" },
+            "StringLike": { "vpc-lattice-svcs:RequestPath": "/productos/*" } } }
+      ]
+    }
+---
+apiVersion: application-networking.k8s.aws/v1alpha1
+kind: IAMAuthPolicy
+metadata:
+  name: clientes-politica
+  namespace: tienda
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: clientes
+  policy: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [{
+        "Effect": "Allow",
+        "Principal": { "AWS": "arn:aws:iam::${CUENTA}:root" },
+        "Action": "vpc-lattice-svcs:Invoke",
+        "Resource": "*",
+        "Condition": {
+          "StringEquals": {
+            "aws:PrincipalTag/eks-cluster-name": "zt-lab",
+            "aws:PrincipalTag/kubernetes-namespace": "tienda",
+            "aws:PrincipalTag/kubernetes-service-account": "pedidos",
+            "vpc-lattice-svcs:RequestMethod": "GET"
+          },
+          "StringLike": { "vpc-lattice-svcs:RequestPath": "/clientes/*" }
+        }
+      }]
+    }
+---
+apiVersion: application-networking.k8s.aws/v1alpha1
+kind: IAMAuthPolicy
+metadata:
+  name: pedidos-politica
+  namespace: tienda
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: pedidos
+  policy: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        { "Sid": "PortalCreaPedidos", "Effect": "Allow",
+          "Principal": { "AWS": "arn:aws:iam::${CUENTA}:root" },
+          "Action": "vpc-lattice-svcs:Invoke", "Resource": "*",
+          "Condition": {
+            "StringEquals": {
+              "aws:PrincipalTag/eks-cluster-name": "zt-lab",
+              "aws:PrincipalTag/kubernetes-namespace": "tienda",
+              "aws:PrincipalTag/kubernetes-service-account": "portal",
+              "vpc-lattice-svcs:RequestMethod": "POST",
+              "vpc-lattice-svcs:RequestPath": "/pedidos" } } },
+        { "Sid": "PortalConsultaPedidos", "Effect": "Allow",
+          "Principal": { "AWS": "arn:aws:iam::${CUENTA}:root" },
+          "Action": "vpc-lattice-svcs:Invoke", "Resource": "*",
+          "Condition": {
+            "StringEquals": {
+              "aws:PrincipalTag/eks-cluster-name": "zt-lab",
+              "aws:PrincipalTag/kubernetes-namespace": "tienda",
+              "aws:PrincipalTag/kubernetes-service-account": "portal",
+              "vpc-lattice-svcs:RequestMethod": "GET" },
+            "StringLike": { "vpc-lattice-svcs:RequestPath": "/pedidos/*" } } }
+      ]
+    }

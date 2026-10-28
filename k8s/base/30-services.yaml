@@ -1,0 +1,48 @@
+# Services de Kubernetes. El selector incluye rol: servicio para que los pods
+# comprometidos (rol: atacante), que comparten identidad, NO sean puntos de enlace.
+# Puerto 8080 (HTTP) para la comunicación directa de la línea base C0; puerto 8443
+# (HTTPS) que VPC Lattice usa como backendRef en C1 (sección 7.2.6, {lst:b_rutas}).
+apiVersion: v1
+kind: Service
+metadata: { name: catalogo, namespace: tienda }
+spec:
+  selector: { app: catalogo, rol: servicio }
+  ports:
+    - { name: http, port: 8080, targetPort: 8080 }
+    - { name: https, port: 8443, targetPort: 8443 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: clientes, namespace: tienda }
+spec:
+  selector: { app: clientes, rol: servicio }
+  ports:
+    - { name: http, port: 8080, targetPort: 8080 }
+    - { name: https, port: 8443, targetPort: 8443 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: pedidos, namespace: tienda }
+spec:
+  selector: { app: pedidos, rol: servicio }
+  ports:
+    - { name: http, port: 8080, targetPort: 8080 }
+    - { name: https, port: 8443, targetPort: 8443 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: pagos, namespace: tienda }
+spec:
+  selector: { app: pagos, rol: servicio }
+  ports:
+    - { name: http, port: 8080, targetPort: 8080 }
+    - { name: https, port: 8443, targetPort: 8443 }
+---
+# API del servicio de auditoría, consumida por Grafana desde observabilidad.
+apiVersion: v1
+kind: Service
+metadata: { name: auditoria, namespace: auditoria }
+spec:
+  selector: { app: auditoria, rol: servicio }
+  ports:
+    - { name: api, port: 8080, targetPort: 8080 }

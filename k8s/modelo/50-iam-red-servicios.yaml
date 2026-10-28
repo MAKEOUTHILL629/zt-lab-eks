@@ -1,0 +1,45 @@
+# Política de autenticación de la red de servicios, primer nivel (Anexo C, {lst:c_red}).
+# SE APLICA EN LA FASE 2 (lab.sh), cuando ya existe el servicio de pagos, porque la
+# segunda declaración referencia su ARN (${ID_SERVICIO_PAGOS}).
+apiVersion: application-networking.k8s.aws/v1alpha1
+kind: IAMAuthPolicy
+metadata:
+  name: zt-red-servicios-politica
+  namespace: tienda
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: zt-red-servicios
+  policy: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Sid": "IdentidadesDelClusterEnTienda",
+          "Effect": "Allow",
+          "Principal": { "AWS": "arn:aws:iam::${CUENTA}:root" },
+          "Action": "vpc-lattice-svcs:Invoke",
+          "Resource": "*",
+          "Condition": {
+            "StringEquals": {
+              "aws:PrincipalTag/eks-cluster-name": "zt-lab",
+              "aws:PrincipalTag/kubernetes-namespace": "tienda"
+            }
+          }
+        },
+        {
+          "Sid": "AnonimosSoloHaciaPagosDesdeLaVpc",
+          "Effect": "Allow",
+          "Principal": "*",
+          "Action": "vpc-lattice-svcs:Invoke",
+          "Resource": "*",
+          "Condition": {
+            "StringEquals": {
+              "vpc-lattice-svcs:ServiceArn": "arn:aws:vpc-lattice:${REGION}:${CUENTA}:service/${ID_SERVICIO_PAGOS}",
+              "vpc-lattice-svcs:SourceVpc": "${ID_VPC}"
+            }
+          }
+        }
+      ]
+    }

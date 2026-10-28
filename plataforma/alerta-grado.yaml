@@ -1,0 +1,37 @@
+# Regla de alerta de Grafana (aprovisionamiento unificado): notifica cuando el grado de
+# anomalía RCF de algún principal supera cero (sección 7.3.7). instalar.sh la carga como
+# ConfigMap etiquetado grafana_alert=1 para el sidecar de Grafana.
+# El punto de contacto (correo, Slack, etc.) se configura aparte según el entorno.
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: zt-lab
+    folder: zt-lab
+    interval: 1m
+    rules:
+      - uid: zt-grado-anomalia
+        title: Grado de anomalia RCF mayor que cero
+        condition: C
+        for: 0m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidad: alta
+        annotations:
+          resumen: "Un principal supera el umbral dinamico del bosque RCF (grado > 0)."
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: max(zt_rcf_grado) by (principal)
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }

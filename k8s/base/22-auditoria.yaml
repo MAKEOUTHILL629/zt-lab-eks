@@ -1,0 +1,54 @@
+# Servicio de auditoría reactivo (capa de detección, sección 7.3).
+# Lee los grupos de registros del laboratorio con Live Tail, construye el vector por
+# principal y ventana, lo puntúa con RCF y expone la API (8080) y las métricas (8081).
+# La API solo es accesible desde observabilidad (política de red auditoria, b5).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auditoria
+  namespace: auditoria
+  labels: { app: auditoria, rol: servicio }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: auditoria, rol: servicio }
+  template:
+    metadata:
+      labels: { app: auditoria, rol: servicio, zt-scrape: "true" }
+    spec:
+      serviceAccountName: auditoria
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: auditoria
+          image: ghcr.io/${PROPIETARIO}/zt-auditoria:${ETIQUETA}
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: SPRING_PROFILES_ACTIVE, value: "${PERFIL}" }
+            - { name: ZT_REGION, value: "${REGION}" }
+          envFrom:
+            - configMapRef: { name: registros, optional: true }
+          ports:
+            - { name: api, containerPort: 8080 }
+            - { name: metrica, containerPort: 8081 }
+          readinessProbe:
+            exec: { command: ["curl", "-fsS", "http://localhost:8081/actuator/health/readiness"] }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec: { command: ["curl", "-fsS", "http://localhost:8081/actuator/health/liveness"] }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "1", memory: "1Gi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}

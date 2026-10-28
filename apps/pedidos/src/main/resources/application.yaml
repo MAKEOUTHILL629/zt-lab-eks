@@ -1,0 +1,46 @@
+# Perfil base (= línea base C0): HTTP plano en 8080. Las URLs de las dependencias las
+# aporta el ConfigMap destinos (CATALOGO_URL, CLIENTES_URL, PAGOS_URL).
+spring:
+  application:
+    name: pedidos
+server:
+  port: 8080
+management:
+  server:
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+        add-additional-paths: true
+---
+# Perfil C1 (modelo): servidor HTTPS en 8443 (client-auth none, lo invoca VPC Lattice)
+# y dos paquetes TLS: servidor (su certificado) y cliente (CN = pedidos, para mTLS a pagos).
+spring:
+  config:
+    activate:
+      on-profile: c1
+  ssl:
+    bundle:
+      pem:
+        servidor:
+          reload-on-update: true
+          keystore:
+            certificate: file:/etc/tls/tls.crt
+            private-key: file:/etc/tls/tls.key
+        cliente:
+          reload-on-update: true
+          keystore:
+            certificate: file:/etc/tls-cliente/tls.crt
+            private-key: file:/etc/tls-cliente/tls.key
+          truststore:
+            certificate: file:/etc/tls-cliente/ca.crt
+server:
+  port: 8443
+  ssl:
+    bundle: servidor
+    client-auth: none

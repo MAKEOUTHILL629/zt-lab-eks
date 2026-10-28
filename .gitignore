@@ -1,0 +1,16 @@
+# OpenTofu / Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+# Java
+**/target/
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+# Resultados locales de experimentos
+*.jsonl
+puntajes.csv
+sensibilidad.csv
+fig_umbral.png

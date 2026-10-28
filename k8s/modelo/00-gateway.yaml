@@ -1,0 +1,50 @@
+# Red de servicios de VPC Lattice, asociación con la VPC y registros de acceso
+# (Anexo B, {lst:b_red}). El nombre del Gateway es el de la red de servicios.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: zt-red-servicios
+  namespace: tienda
+spec:
+  gatewayClassName: amazon-vpc-lattice
+  listeners:
+    - name: https # modo A: TLS terminado en VPC Lattice + firma SigV4
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: unused # exigido por la API; el controlador no lo usa
+    - name: tls # modo B: paso directo TLS (mTLS extremo a extremo)
+      protocol: TLS
+      port: 8443
+      tls:
+        mode: Passthrough
+---
+# Asociación de la red de servicios con la VPC del laboratorio.
+apiVersion: application-networking.k8s.aws/v1alpha1
+kind: VpcAssociationPolicy
+metadata:
+  name: zt-asociacion-vpc
+  namespace: tienda
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: zt-red-servicios
+  associateWithVpc: true
+  securityGroupIds:
+    - ${SG_ASOCIACION} # entrada TCP 443 y 8443 desde las subredes privadas
+---
+# Registros de acceso de todos los servicios de la red hacia CloudWatch Logs.
+apiVersion: application-networking.k8s.aws/v1alpha1
+kind: AccessLogPolicy
+metadata:
+  name: zt-registros-acceso
+  namespace: tienda
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: zt-red-servicios
+  destinationArn: arn:aws:logs:${REGION}:${CUENTA}:log-group:/zt-lab/lattice/acceso:*

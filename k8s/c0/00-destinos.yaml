@@ -1,0 +1,12 @@
+# Línea base C0: los servicios se comunican directamente por los Services internos de
+# Kubernetes, en HTTP plano (sección 6.1). Sin VPC Lattice, sin firma, sin mTLS.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: destinos
+  namespace: tienda
+data:
+  CATALOGO_URL: "http://catalogo.tienda.svc.cluster.local:8080"
+  CLIENTES_URL: "http://clientes.tienda.svc.cluster.local:8080"
+  PEDIDOS_URL: "http://pedidos.tienda.svc.cluster.local:8080"
+  PAGOS_URL: "http://pagos.tienda.svc.cluster.local:8080"

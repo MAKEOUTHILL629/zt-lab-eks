@@ -1,0 +1,52 @@
+# Valores de kube-prometheus-stack para el laboratorio (sección 7.3.9).
+# - Alertmanager desactivado: las alertas se gestionan en Grafana (regla grado > 0).
+# - Los selectores NilUsesHelmValues en false hacen que el operador tome TODOS los
+#   PodMonitors del clúster (los de k8s/base), sin exigir etiqueta de versión.
+# - Grafana OSS con el complemento Infinity para consumir la API REST de auditoría.
+
+alertmanager:
+  enabled: false
+
+# Componente de métricas de nodo y estado del clúster (sobrecarga por nodo, OE4).
+nodeExporter:
+  enabled: true
+kubeStateMetrics:
+  enabled: true
+
+prometheus:
+  prometheusSpec:
+    retention: 2d
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    resources:
+      requests: { cpu: 250m, memory: 512Mi }
+      limits: { cpu: "1", memory: "1.5Gi" }
+
+grafana:
+  # Cambie esta contraseña antes de exponer Grafana (solo laboratorio).
+  adminPassword: zt-lab-admin
+  defaultDashboardsEnabled: false
+  plugins:
+    - yesoreyeram-infinity-datasource # complemento Infinity v4.x (API REST)
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL
+    alerts:
+      enabled: true
+      label: grafana_alert
+      searchNamespace: ALL
+  additionalDataSources:
+    - name: Auditoria
+      uid: auditoria
+      type: yesoreyeram-infinity-datasource
+      access: proxy
+      isDefault: false
+      jsonData:
+        global_queries: []
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }

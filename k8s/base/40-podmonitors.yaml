@@ -1,0 +1,28 @@
+# PodMonitors: Prometheus raspa el puerto de gestión 8081 (/actuator/prometheus) de
+# los pods etiquetados zt-scrape=true (sección 7.3.9). El operador los selecciona
+# porque los valores del stack desactivan el filtro por etiqueta de versión.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: tienda
+  namespace: tienda
+spec:
+  selector:
+    matchLabels: { zt-scrape: "true" }
+  podMetricsEndpoints:
+    - port: metrica
+      path: /actuator/prometheus
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: auditoria
+  namespace: auditoria
+spec:
+  selector:
+    matchLabels: { zt-scrape: "true" }
+  podMetricsEndpoints:
+    - port: metrica
+      path: /actuator/prometheus
+      interval: 15s

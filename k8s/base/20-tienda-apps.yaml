@@ -1,0 +1,231 @@
+# Microservicios Java de la tienda (catalogo, clientes, pedidos, pagos).
+# El perfil de Spring (${PERFIL}) selecciona el comportamiento:
+#   c0  -> escucha HTTP en 8080, llama a sus dependencias sin firmar (línea base).
+#   c1  -> escucha HTTPS/mTLS en 8443 y firma con SigV4 (modo A) o usa mTLS (modo B).
+# El puerto de gestión 8081 (métricas, sin TLS) está activo en ambos perfiles.
+# El volumen de certificados es opcional: en C0 el secreto no existe y el pod arranca
+# igual; en C1 lo crea cert-manager (k8s/modelo).
+#
+# Etiqueta rol: servicio -> los Services solo seleccionan estos pods, no los pods
+# comprometidos (rol: atacante), que comparten identidad pero no reciben tráfico.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalogo
+  namespace: tienda
+  labels: { app: catalogo, rol: servicio }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: catalogo, rol: servicio }
+  template:
+    metadata:
+      labels: { app: catalogo, rol: servicio, zt-scrape: "true" }
+    spec:
+      serviceAccountName: catalogo
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: app
+          image: ghcr.io/${PROPIETARIO}/zt-catalogo:${ETIQUETA}
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: SPRING_PROFILES_ACTIVE, value: "${PERFIL}" }
+            - { name: ZT_REGION, value: "${REGION}" }
+          envFrom:
+            - configMapRef: { name: destinos }
+          ports:
+            - { name: http, containerPort: 8080 }
+            - { name: https, containerPort: 8443 }
+            - { name: metrica, containerPort: 8081 }
+          readinessProbe:
+            exec: { command: ["curl", "-fsS", "http://localhost:8081/actuator/health/readiness"] }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec: { command: ["curl", "-fsS", "http://localhost:8081/actuator/health/liveness"] }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tls, mountPath: /etc/tls, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tls
+          secret: { secretName: catalogo-tls, optional: true }
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clientes
+  namespace: tienda
+  labels: { app: clientes, rol: servicio }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: clientes, rol: servicio }
+  template:
+    metadata:
+      labels: { app: clientes, rol: servicio, zt-scrape: "true" }
+    spec:
+      serviceAccountName: clientes
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: app
+          image: ghcr.io/${PROPIETARIO}/zt-clientes:${ETIQUETA}
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: SPRING_PROFILES_ACTIVE, value: "${PERFIL}" }
+            - { name: ZT_REGION, value: "${REGION}" }
+          envFrom:
+            - configMapRef: { name: destinos }
+          ports:
+            - { name: http, containerPort: 8080 }
+            - { name: https, containerPort: 8443 }
+            - { name: metrica, containerPort: 8081 }
+          readinessProbe:
+            exec: { command: ["curl", "-fsS", "http://localhost:8081/actuator/health/readiness"] }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec: { command: ["curl", "-fsS", "http://localhost:8081/actuator/health/liveness"] }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tls, mountPath: /etc/tls, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tls
+          secret: { secretName: clientes-tls, optional: true }
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pedidos
+  namespace: tienda
+  labels: { app: pedidos, rol: servicio }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: pedidos, rol: servicio }
+  template:
+    metadata:
+      labels: { app: pedidos, rol: servicio, zt-scrape: "true" }
+    spec:
+      serviceAccountName: pedidos
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: app
+          image: ghcr.io/${PROPIETARIO}/zt-pedidos:${ETIQUETA}
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: SPRING_PROFILES_ACTIVE, value: "${PERFIL}" }
+            - { name: ZT_REGION, value: "${REGION}" }
+          envFrom:
+            - configMapRef: { name: destinos }
+          ports:
+            - { name: http, containerPort: 8080 }
+            - { name: https, containerPort: 8443 }
+            - { name: metrica, containerPort: 8081 }
+          readinessProbe:
+            exec: { command: ["curl", "-fsS", "http://localhost:8081/actuator/health/readiness"] }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec: { command: ["curl", "-fsS", "http://localhost:8081/actuator/health/liveness"] }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tls, mountPath: /etc/tls, readOnly: true }
+            - { name: cliente-tls, mountPath: /etc/tls-cliente, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tls
+          secret: { secretName: pedidos-tls, optional: true }
+        - name: cliente-tls
+          secret: { secretName: pedidos-cliente-tls, optional: true }
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pagos
+  namespace: tienda
+  labels: { app: pagos, rol: servicio }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: pagos, rol: servicio }
+  template:
+    metadata:
+      labels: { app: pagos, rol: servicio, zt-scrape: "true" }
+    spec:
+      serviceAccountName: pagos
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: app
+          image: ghcr.io/${PROPIETARIO}/zt-pagos:${ETIQUETA}
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: SPRING_PROFILES_ACTIVE, value: "${PERFIL}" }
+            - { name: ZT_REGION, value: "${REGION}" }
+          envFrom:
+            - configMapRef: { name: destinos }
+          ports:
+            - { name: https, containerPort: 8443 }
+            - { name: metrica, containerPort: 8081 }
+          readinessProbe:
+            exec: { command: ["curl", "-fsS", "http://localhost:8081/actuator/health/readiness"] }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec: { command: ["curl", "-fsS", "http://localhost:8081/actuator/health/liveness"] }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tls, mountPath: /etc/tls, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tls
+          secret: { secretName: pagos-tls, optional: true }
+        - name: tmp
+          emptyDir: {}

@@ -1,0 +1,45 @@
+# Pod comprometido de la línea base C0: usa la identidad de catalogo (cuenta de
+# servicio catalogo) pero NO lleva rol: servicio, por lo que los Services no lo toman
+# como destino. Permanece activo (sleep) para que el operador ejecute en él la prueba
+# de alcance y los escenarios con kubectl exec. En C0 se espera alcance lateral alto.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atacante-catalogo
+  namespace: tienda
+  labels: { app: atacante-catalogo, rol: atacante }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: atacante-catalogo, rol: atacante }
+  template:
+    metadata:
+      labels: { app: atacante-catalogo, rol: atacante }
+    spec:
+      serviceAccountName: catalogo
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: atacante
+          image: ghcr.io/${PROPIETARIO}/zt-ataques:${ETIQUETA}
+          imagePullPolicy: IfNotPresent
+          command: ["sleep", "infinity"]
+          env:
+            - { name: ZT_MODO, value: "c0" }
+            - { name: ZT_REGION, value: "${REGION}" }
+          envFrom:
+            - configMapRef: { name: destinos }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: trabajo, mountPath: /trabajo }
+      volumes:
+        - name: trabajo
+          emptyDir: {}

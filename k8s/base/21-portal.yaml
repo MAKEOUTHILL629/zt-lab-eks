@@ -1,0 +1,45 @@
+# Portal: generador de tráfico legítimo L0 en Python (sección 7.4.1). No expone API;
+# produce llamadas a catalogo y pedidos como un proceso de llegadas de Poisson.
+# En C1 firma cada solicitud con SigV4 (módulo firmar.py); en C0 llama por HTTP.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: portal
+  namespace: tienda
+  labels: { app: portal, rol: servicio }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: portal, rol: servicio }
+  template:
+    metadata:
+      labels: { app: portal, rol: servicio }
+    spec:
+      serviceAccountName: portal
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: portal
+          image: ghcr.io/${PROPIETARIO}/zt-portal:${ETIQUETA}
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-u", "portal.py"]
+          env:
+            - { name: ZT_MODO, value: "${PERFIL}" }
+            - { name: ZT_REGION, value: "${REGION}" }
+            - { name: ZT_TASA, value: "5" } # solicitudes/segundo (media de Poisson)
+          envFrom:
+            - configMapRef: { name: destinos }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}

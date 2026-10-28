@@ -1,0 +1,93 @@
+# Pods comprometidos de la configuración C1. Comparten la identidad de un servicio
+# (cuenta de servicio) pero llevan rol: atacante, de modo que reciben las mismas
+# políticas de red que su servicio pero no son destino de ningún Service.
+# Se usan Deployments porque las políticas de red de Amazon VPC CNI solo se aplican de
+# forma consistente a pods creados por Deployments (sección 7.4.2).
+#
+# atacante-catalogo: identidad de catalogo (silenciosa) -> escenarios E1-E6, E8.
+# atacante-pedidos:  identidad de pedidos (con tráfico legítimo) -> escenario E7.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atacante-catalogo
+  namespace: tienda
+  labels: { app: atacante-catalogo, rol: atacante }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: atacante-catalogo, rol: atacante }
+  template:
+    metadata:
+      labels: { app: atacante-catalogo, rol: atacante }
+    spec:
+      serviceAccountName: catalogo
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: atacante
+          image: ghcr.io/${PROPIETARIO}/zt-ataques:${ETIQUETA}
+          imagePullPolicy: IfNotPresent
+          command: ["sleep", "infinity"]
+          env:
+            - { name: ZT_MODO, value: "c1" }
+            - { name: ZT_IDENTIDAD, value: "tienda/catalogo" }
+            - { name: ZT_REGION, value: "${REGION}" }
+          envFrom:
+            - configMapRef: { name: destinos }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: trabajo, mountPath: /trabajo }
+      volumes:
+        - name: trabajo
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atacante-pedidos
+  namespace: tienda
+  labels: { app: atacante-pedidos, rol: atacante }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: atacante-pedidos, rol: atacante }
+  template:
+    metadata:
+      labels: { app: atacante-pedidos, rol: atacante }
+    spec:
+      serviceAccountName: pedidos
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: atacante
+          image: ghcr.io/${PROPIETARIO}/zt-ataques:${ETIQUETA}
+          imagePullPolicy: IfNotPresent
+          command: ["sleep", "infinity"]
+          env:
+            - { name: ZT_MODO, value: "c1" }
+            - { name: ZT_IDENTIDAD, value: "tienda/pedidos" }
+            - { name: ZT_REGION, value: "${REGION}" }
+          envFrom:
+            - configMapRef: { name: destinos }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: trabajo, mountPath: /trabajo }
+      volumes:
+        - name: trabajo
+          emptyDir: {}

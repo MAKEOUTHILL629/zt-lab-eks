@@ -1,0 +1,111 @@
+# Autoridad de certificación propia y certificados de las cargas de trabajo
+# (Anexo B, {lst:b_certificados}). Vigencia 24 h con renovación 8 h antes; Spring
+# recarga el material al cambiar los archivos, sin reiniciar.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: autofirmado
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: zt-lab-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: zt-lab-ca
+  secretName: zt-lab-ca
+  duration: 2160h # 90 días
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: autofirmado
+    kind: ClusterIssuer
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: zt-lab-ca
+spec:
+  ca:
+    secretName: zt-lab-ca
+---
+# Certificados de servidor de los servicios del modo A (catalogo, clientes, pedidos).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: catalogo-tls
+  namespace: tienda
+spec:
+  secretName: catalogo-tls
+  commonName: catalogo
+  dnsNames: ["catalogo.tienda.svc.cluster.local", "catalogo"]
+  duration: 24h
+  renewBefore: 8h
+  usages: ["server auth"]
+  privateKey: { algorithm: ECDSA, size: 256, encoding: PKCS8, rotationPolicy: Always }
+  issuerRef: { name: zt-lab-ca, kind: ClusterIssuer }
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: clientes-tls
+  namespace: tienda
+spec:
+  secretName: clientes-tls
+  commonName: clientes
+  dnsNames: ["clientes.tienda.svc.cluster.local", "clientes"]
+  duration: 24h
+  renewBefore: 8h
+  usages: ["server auth"]
+  privateKey: { algorithm: ECDSA, size: 256, encoding: PKCS8, rotationPolicy: Always }
+  issuerRef: { name: zt-lab-ca, kind: ClusterIssuer }
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: pedidos-tls
+  namespace: tienda
+spec:
+  secretName: pedidos-tls
+  commonName: pedidos
+  dnsNames: ["pedidos.tienda.svc.cluster.local", "pedidos"]
+  duration: 24h
+  renewBefore: 8h
+  usages: ["server auth"]
+  privateKey: { algorithm: ECDSA, size: 256, encoding: PKCS8, rotationPolicy: Always }
+  issuerRef: { name: zt-lab-ca, kind: ClusterIssuer }
+---
+# Certificado de CLIENTE de pedidos (CN = pedidos): identidad que autoriza pagos.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: pedidos-cliente-tls
+  namespace: tienda
+spec:
+  secretName: pedidos-cliente-tls
+  commonName: pedidos
+  duration: 24h
+  renewBefore: 8h
+  usages: ["client auth"]
+  privateKey: { algorithm: ECDSA, size: 256, encoding: PKCS8, rotationPolicy: Always }
+  issuerRef: { name: zt-lab-ca, kind: ClusterIssuer }
+---
+# Certificado de servidor de pagos (modo B): servidor mTLS con dominio personalizado.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: pagos-tls
+  namespace: tienda
+spec:
+  secretName: pagos-tls # tls.crt, tls.key y ca.crt, montados en /etc/tls
+  commonName: pagos
+  dnsNames: ["pagos.zt-lab.internal"]
+  duration: 24h
+  renewBefore: 8h
+  usages: ["server auth", "client auth"]
+  privateKey: { algorithm: ECDSA, size: 256, encoding: PKCS8, rotationPolicy: Always }
+  issuerRef: { name: zt-lab-ca, kind: ClusterIssuer }

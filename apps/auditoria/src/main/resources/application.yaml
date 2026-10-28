@@ -1,0 +1,19 @@
+# El servicio de auditoría expone la API en 8080 y las métricas/sondas en 8081, sin TLS
+# (la política de red solo admite a observabilidad). ZT_GRUPOS (ARN de los tres grupos)
+# y ZT_ARCHIVO (reproducción) llegan por variables de entorno.
+spring:
+  application:
+    name: auditoria
+server:
+  port: 8080
+management:
+  server:
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true

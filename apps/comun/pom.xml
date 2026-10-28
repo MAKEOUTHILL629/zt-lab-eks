@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>co.edu.udistrital.ztlab</groupId>
+    <artifactId>zt-lab</artifactId>
+    <version>1.0.0</version>
+  </parent>
+
+  <!-- Biblioteca compartida: filtro de firma SigV4 para el modo A (sección 7.2.6). -->
+  <artifactId>comun</artifactId>
+  <packaging>jar</packaging>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webflux</artifactId>
+    </dependency>
+    <dependency> <!-- firmador SigV4 del SDK de AWS -->
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>http-auth-aws</artifactId>
+    </dependency>
+    <dependency> <!-- cadena de credenciales por defecto (EKS Pod Identity) -->
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>auth</artifactId>
+    </dependency>
+  </dependencies>
+</project>

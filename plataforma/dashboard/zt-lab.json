@@ -1,0 +1,153 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "schemaVersion": 39,
+  "title": "Zero Trust - tráfico Este-Oeste (zt-lab)",
+  "uid": "zt-lab",
+  "tags": ["zt-lab", "zero-trust"],
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "api",
+        "type": "constant",
+        "label": "URL API auditoría",
+        "query": "http://auditoria.auditoria.svc.cluster.local:8080",
+        "current": { "value": "http://auditoria.auditoria.svc.cluster.local:8080" },
+        "hide": 2
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "nodeGraph",
+      "title": "Topología Este-Oeste",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "auditoria" },
+      "targets": [
+        {
+          "refId": "nodos",
+          "type": "json", "source": "url", "format": "nodeGraph-nodes",
+          "url": "${api}/api/v1/topologia/nodos", "root_selector": "",
+          "columns": [
+            { "selector": "id", "text": "id", "type": "string" },
+            { "selector": "titulo", "text": "title", "type": "string" },
+            { "selector": "grado", "text": "mainstat", "type": "number" }
+          ]
+        },
+        {
+          "refId": "aristas",
+          "type": "json", "source": "url", "format": "nodeGraph-edges",
+          "url": "${api}/api/v1/topologia/aristas", "root_selector": "",
+          "columns": [
+            { "selector": "id", "text": "id", "type": "string" },
+            { "selector": "origen", "text": "source", "type": "string" },
+            { "selector": "destino", "text": "target", "type": "string" },
+            { "selector": "denegaciones", "text": "mainstat", "type": "number" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Puntaje de anomalía por principal",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "zt_rcf_puntaje", "legendFormat": "puntaje {{principal}}" },
+        { "refId": "B", "expr": "zt_rcf_grado", "legendFormat": "grado {{principal}}" }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line" } }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Alertas activas",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "auditoria" },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json", "source": "url", "format": "table",
+          "url": "${api}/api/v1/alertas", "root_selector": "",
+          "columns": [
+            { "selector": "inicio", "text": "ventana", "type": "timestamp" },
+            { "selector": "principal", "text": "principal", "type": "string" },
+            { "selector": "puntaje", "text": "puntaje", "type": "number" },
+            { "selector": "grado", "text": "grado", "type": "number" },
+            { "selector": "tta", "text": "TTA (s)", "type": "number" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Denegaciones de autorización",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum by (servicio, razon) (rate(zt_lattice_peticiones_total{resultado=\"denegado\"}[5m]))", "legendFormat": "{{servicio}} {{razon}}" },
+        { "refId": "B", "expr": "rate(zt_mtls_rechazos_total[5m])", "legendFormat": "mTLS rechazos (pagos)" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Latencia Este-Oeste (p50/p95/p99)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.50, sum by (le) (rate(zt_lattice_duracion_ms_bucket[5m])))", "legendFormat": "p50" },
+        { "refId": "B", "expr": "histogram_quantile(0.95, sum by (le) (rate(zt_lattice_duracion_ms_bucket[5m])))", "legendFormat": "p95" },
+        { "refId": "C", "expr": "histogram_quantile(0.99, sum by (le) (rate(zt_lattice_duracion_ms_bucket[5m])))", "legendFormat": "p99" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Intentos bloqueados por políticas de red",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum by (origen, destino) (rate(zt_red_bloqueos_total[5m]))", "legendFormat": "{{origen}} -> {{destino}}" }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "xychart",
+      "title": "Dispersión del vector (intensidad vs. rechazo)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "auditoria" },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json", "source": "url", "format": "table",
+          "url": "${api}/api/v1/puntajes", "root_selector": "",
+          "columns": [
+            { "selector": "x1", "text": "intensidad", "type": "number" },
+            { "selector": "x3", "text": "rechazo", "type": "number" },
+            { "selector": "grado", "text": "grado", "type": "number" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Salud de la ingesta",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "rate(zt_ingesta_eventos_total[5m])", "legendFormat": "eventos/s" },
+        { "refId": "B", "expr": "rate(zt_ingesta_tardios_total[5m])", "legendFormat": "eventos tardíos/s" },
+        { "refId": "C", "expr": "zt_ingesta_muestreadas_total", "legendFormat": "actualizaciones muestreadas" },
+        { "refId": "D", "expr": "histogram_quantile(0.99, sum by (le) (rate(zt_puntuacion_latencia_seconds_bucket[5m])))", "legendFormat": "latencia puntuación p99 (s)" }
+      ]
+    }
+  ]
+}

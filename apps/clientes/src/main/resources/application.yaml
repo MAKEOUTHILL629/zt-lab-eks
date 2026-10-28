@@ -1,0 +1,37 @@
+# Perfil base (= línea base C0): HTTP plano en 8080, gestión en 8081.
+spring:
+  application:
+    name: clientes
+server:
+  port: 8080
+management:
+  server:
+    port: 8081 # métricas y sondas sin TLS, solo desde observabilidad
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+        add-additional-paths: true # expone /readyz y /livez en el puerto principal
+---
+# Perfil C1 (modelo): HTTPS en 8443 con certificado de cert-manager; client-auth none.
+spring:
+  config:
+    activate:
+      on-profile: c1
+  ssl:
+    bundle:
+      pem:
+        servidor:
+          reload-on-update: true # recarga el material al renovarlo cert-manager
+          keystore:
+            certificate: file:/etc/tls/tls.crt
+            private-key: file:/etc/tls/tls.key
+server:
+  port: 8443
+  ssl:
+    bundle: servidor
+    client-auth: none

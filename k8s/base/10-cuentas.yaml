@@ -1,0 +1,45 @@
+# Cuentas de servicio: una por microservicio. EKS Pod Identity (etapa infra) asocia
+# cada una con su rol de IAM y le entrega credenciales temporales con etiquetas de
+# sesión (sección 7.2.4). No se montan tokens de la API de Kubernetes: las cargas no
+# hablan con el API server.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: portal
+  namespace: tienda
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pedidos
+  namespace: tienda
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: catalogo
+  namespace: tienda
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: clientes
+  namespace: tienda
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pagos
+  namespace: tienda
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: auditoria
+  namespace: auditoria
+automountServiceAccountToken: false
