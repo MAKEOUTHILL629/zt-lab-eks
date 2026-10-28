@@ -8,6 +8,8 @@ server:
 management:
   server:
     port: 8081
+    ssl:
+      enabled: false # métricas sin TLS, solo desde observabilidad
   endpoints:
     web:
       exposure:
