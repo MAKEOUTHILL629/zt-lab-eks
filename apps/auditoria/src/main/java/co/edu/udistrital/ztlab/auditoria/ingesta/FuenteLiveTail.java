@@ -50,7 +50,7 @@ public class FuenteLiveTail implements FuenteTelemetria {
 
   /** Reconecta al terminar una sesión (repeat) y ante errores (backoff). */
   Flux<LiveTailSessionLogEvent> eventos() {
-    return sesion()
+    return Flux.defer(this::sesion)
         .repeat() // fin de sesión (3 h): reabrir
         .retryWhen(Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(2))); // errores
   }
