@@ -47,4 +47,5 @@ spec:
     group: gateway.networking.k8s.io
     kind: Gateway
     name: zt-red-servicios
+    namespace: tienda # sin él el controlador busca el Gateway en "default"
   destinationArn: arn:aws:logs:${REGION}:${CUENTA}:log-group:/zt-lab/lattice/acceso:*
