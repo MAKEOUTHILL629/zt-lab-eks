@@ -45,14 +45,14 @@ def crear_repeticion(carpeta, desplazamiento):
             ataque = (principal == "tienda/catalogo" and (60 <= m - d <= 60 or 80 <= m - d < 90)) or (
                 principal == "tienda/pedidos" and 95 <= m - d < 105)
             puntaje = 0.0 if m - d < 10 else (3.0 if ataque else 0.5 + 0.01 * (m % 7))
-            if principal == "tienda/portal" and m - d == 40:
-                puntaje = 3.0  # un falso positivo
+            if principal == "tienda/portal" and m - d == 100:
+                puntaje = 3.0  # un falso positivo, dentro de la repetición (inicia en d + 55)
             filas.append((principal, iso(m), puntaje, 1.0 if puntaje >= 3.0 else 0.0))
     pd.DataFrame(filas, columns=["principal", "inicio", "puntaje", "grado"]).to_csv(
         carpeta / "puntajes.csv", index=False)
     (carpeta / "alertas.json").write_text(json.dumps([
         {"principal": "tienda/catalogo", "inicio": iso(d + 60), "puntaje": 3.0, "grado": 1.0, "tta": 250},
-        {"principal": "tienda/portal", "inicio": iso(d + 40), "puntaje": 3.0, "grado": 1.0, "tta": 240}]))
+        {"principal": "tienda/portal", "inicio": iso(d + 100), "puntaje": 3.0, "grado": 1.0, "tta": 240}]))
     (carpeta / "estado.json").write_text(json.dumps({"eventos": 1000, "tardios": 0, "muestreadas": 0}))
     (carpeta / "metricas_auditoria.prom").write_text(
         'zt_puntuacion_latencia_seconds_bucket{le="0.001"} 50\n'
@@ -97,6 +97,14 @@ def test_cuantil_histograma_interpola_en_el_cubo():
     assert math.isnan(r.cuantil_histograma("", "x_seconds", 0.5))
 
 
+def test_cubo_cuantil_devuelve_los_limites_del_cubo():
+    texto = ('x_seconds_bucket{le="0.001"} 50\nx_seconds_bucket{le="0.002"} 100\n'
+             'x_seconds_bucket{le="+Inf"} 100\n')
+    assert r.cubo_cuantil(texto, "x_seconds", 0.5) == (0.0, 0.001)
+    assert r.cubo_cuantil(texto, "x_seconds", 0.99) == (0.001, 0.002)
+    assert all(math.isnan(v) for v in r.cubo_cuantil("", "x_seconds", 0.5))
+
+
 def test_bloqueo_estricto_no_cuenta_un_404():
     assert r.bloqueado_estricto(403) and r.bloqueado_estricto("SSLError")
     assert not r.bloqueado_estricto(404) and not r.bloqueado_estricto("conectado")
@@ -136,6 +144,21 @@ def test_calcular_con_datos_sinteticos(tmp_path):
     assert res["fp_h_total"]["umbral"] > 0  # el falso positivo del portal
     assert res["operacion"]["muestreadas"] == 0.0
     assert math.isclose(res["operacion"]["puntuacion_p99_ms"], 1.98, rel_tol=1e-6)
+    assert res["operacion"]["puntuacion_p99_cubo"] == (1.0, 2.0)  # milisegundos
+
+
+def test_el_calentamiento_del_protocolo_no_entra_en_la_curva_ni_en_fp_h(tmp_path):
+    carpeta = datos(tmp_path)
+    base = r.calcular(str(carpeta))
+    ruta = carpeta / "rep1" / "puntajes.csv"
+    p = pd.read_csv(ruta)
+    # una ventana benigna de alto puntaje con bosque listo (minuto 20) pero antes de iniciar la repetición 1 (minuto 55)
+    p.loc[(p["principal"] == "tienda/portal") & (p["inicio"] == iso(20)), "puntaje"] = 3.0
+    p.to_csv(ruta, index=False)
+    con_extra = r.calcular(str(carpeta))
+    assert con_extra["ventanas"] == base["ventanas"]
+    assert con_extra["fp_h_total"] == base["fp_h_total"]
+    assert con_extra["umbral"] == base["umbral"]
 
 
 def test_main_escribe_los_archivos(tmp_path):

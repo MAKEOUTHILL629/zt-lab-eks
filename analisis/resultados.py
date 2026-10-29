@@ -20,7 +20,8 @@ Definiciones (sección 6.5 de la monografía):
   * VP/FN de un escenario son sus ventanas positivas; los FP de una fila son las ventanas
     negativas marcadas de los principales de ese escenario; la fila global suma todos.
   * Solo se consideran las ventanas posteriores a la primera con puntaje mayor que cero de
-    cada principal: antes, su bosque aún no produce salida (calentamiento).
+    cada principal (antes, su bosque aún no produce salida) y posteriores al inicio de la
+    primera repetición: el calentamiento del protocolo no entra en la curva ni en FP/h.
   * Los percentiles de latencia del portal se calculan sobre las muestras individuales.
 """
 import glob
@@ -119,11 +120,30 @@ def percentiles(valores, qs=(50, 95, 99)):
     return {q: float(np.percentile(valores, q)) for q in qs}
 
 
+def _cubos(texto, metrica):
+    """Cubos acumulados (límite superior, cuenta) de un histograma de Prometheus, ordenados."""
+    patron = re.compile(r'^%s_bucket\{[^}]*le="([^"]+)"[^}]*\}\s+([0-9.eE+-]+)' % re.escape(metrica), re.M)
+    return sorted((math.inf if le in ("+Inf", "Inf") else float(le), float(n))
+                  for le, n in patron.findall(texto))
+
+
+def cubo_cuantil(texto, metrica, q):
+    """(límite inferior, límite superior) del cubo donde cae el cuantil q; (nan, nan) sin datos."""
+    cubos = _cubos(texto, metrica)
+    if not cubos or cubos[-1][1] == 0:
+        return NAN, NAN
+    objetivo = q * cubos[-1][1]
+    previo_le = 0.0
+    for le, n in cubos:
+        if n >= objetivo:
+            return previo_le, le
+        previo_le = le
+    return NAN, NAN
+
+
 def cuantil_histograma(texto, metrica, q):
     """Cuantil q (0-1) de un histograma de Prometheus por interpolación lineal en el cubo."""
-    patron = re.compile(r'^%s_bucket\{[^}]*le="([^"]+)"[^}]*\}\s+([0-9.eE+-]+)' % re.escape(metrica), re.M)
-    cubos = sorted((math.inf if le in ("+Inf", "Inf") else float(le), float(n))
-                   for le, n in patron.findall(texto))
+    cubos = _cubos(texto, metrica)
     if not cubos or cubos[-1][1] == 0:
         return NAN
     objetivo = q * cubos[-1][1]
@@ -319,7 +339,7 @@ def figura_umbral(curva, umbral, ruta):
     eje_fp.plot(curva["umbral"], curva["fp_h"], "k--", label="FP/h")
     eje_fp.set_ylabel("Falsos positivos por hora")
     figura.legend(loc="upper center", ncol=5)
-    figura.tight_layout()
+    figura.tight_layout(rect=(0, 0, 1, 0.93))  # deja libre el borde superior para la leyenda
     figura.savefig(ruta, dpi=200)
     plt.close(figura)
 
@@ -385,6 +405,10 @@ def calcular(carpeta):
     puntajes = leer_puntajes(reps)
     if not puntajes.empty and not bit_todas.empty:
         etiquetadas = ventanas_listas(etiquetar_ventanas(puntajes, bit_todas))
+        limites = limites_repeticion(reps)
+        primera = next((d for d, _ in limites if d is not None), None)
+        if primera is not None:  # el calentamiento del protocolo no entra en la curva ni en FP/h
+            etiquetadas = etiquetadas[etiquetadas["inicio"] >= primera]
         horas = horas_legitimas(etiquetadas)
         curva = umbral_mod.curva_sensibilidad(etiquetadas, horas)
         valor_umbral, f1_umbral = elegir_umbral(curva)
@@ -392,7 +416,6 @@ def calcular(carpeta):
                                          alerta=etiquetadas["grado"] > 0)
         res.update({"curva": curva, "umbral": valor_umbral, "f1_umbral": f1_umbral,
                     "horas_legitimas": horas, "ventanas": len(etiquetadas)})
-        limites = limites_repeticion(reps)
         por_rep = {"umbral": [], "alerta": []}
         fp_h = {"umbral": [], "alerta": []}
         for (desde, hasta) in limites:
@@ -414,10 +437,15 @@ def calcular(carpeta):
     if ultima and os.path.exists(os.path.join(ultima, "metricas_auditoria.prom")):
         prom = open(os.path.join(ultima, "metricas_auditoria.prom"), encoding="utf-8").read()
         cq = lambda m, q: cuantil_histograma(prom, m, q) * 1000.0
+        cubo = lambda m, q: tuple(x * 1000.0 for x in cubo_cuantil(prom, m, q))
         res["operacion"] = {
             "puntuacion_p50_ms": cq("zt_puntuacion_latencia_seconds", 0.50),
             "puntuacion_p99_ms": cq("zt_puntuacion_latencia_seconds", 0.99),
+            "puntuacion_p99_cubo": cubo("zt_puntuacion_latencia_seconds", 0.99),
+            "puntuaciones": contador(prom, "zt_puntuacion_latencia_seconds_count"),
             "proceso_p99_ms": cq("zt_procesamiento_evento_seconds", 0.99),
+            "proceso_p99_cubo": cubo("zt_procesamiento_evento_seconds", 0.99),
+            "eventos": contador(prom, "zt_procesamiento_evento_seconds_count"),
             "muestreadas": contador(prom, "zt_ingesta_muestreadas_total")}
     return res
 
@@ -427,6 +455,11 @@ def f(x, dec=1):
     if x is None or (isinstance(x, float) and math.isnan(x)):
         return "n/d"
     return f"{x:.{dec}f}".replace(".", ",")
+
+
+def rango(cubo):
+    """'a–b ms' de un cubo de histograma con límites en milisegundos."""
+    return f"{f(cubo[0], 1)}–{f(cubo[1], 1)} ms"
 
 
 def ms(r, dec=1):
@@ -530,8 +563,10 @@ def redactar(r):
                  f"{f(r['fp_h_total']['alerta'], 2)} con grado > 0 | Criterio de operabilidad |")
     op = r.get("operacion")
     if op:
-        L.append(f"| Latencia de puntuación por vector, p50 / p99 | {f(op['puntuacion_p50_ms'], 3)} / {f(op['puntuacion_p99_ms'], 3)} ms | Objetivo de diseño: p99 < 10 ms |")
-        L.append(f"| Latencia interna de procesamiento por evento, p99 | {f(op['proceso_p99_ms'], 3)} ms | Objetivo de diseño: < 100 ms |")
+        L.append(f"| Latencia de puntuación por vector, p50 / p99 | {f(op['puntuacion_p50_ms'], 3)} / {f(op['puntuacion_p99_ms'], 3)} ms "
+                 f"(p99 en el cubo {rango(op['puntuacion_p99_cubo'])}; {f(op['puntuaciones'], 0)} puntuaciones) | Objetivo de diseño: p99 < 10 ms |")
+        L.append(f"| Latencia interna de procesamiento por evento, p99 | {f(op['proceso_p99_ms'], 3)} ms "
+                 f"(cubo {rango(op['proceso_p99_cubo'])}; {f(op['eventos'], 0)} eventos) | Objetivo de diseño: < 100 ms |")
     if "umbral" in r:
         L.append(f"| Umbral de puntaje elegido y F1 asociado | {f(r['umbral'], 3)} y {f(r['f1_umbral'], 3)} | Curva de la Figura 9 |")
     if op:
