@@ -176,7 +176,7 @@ borrar_cname_pagos() {
   local zona nombre reg
   zona="$(cd "$RAIZ/infra" && $TOFU output -raw zona_privada_id 2>/dev/null)" || return 0
   nombre="pagos.$(cd "$RAIZ/infra" && $TOFU output -raw zona_privada_nombre 2>/dev/null)"
-  reg="$(aws route53 list-resource-record-sets --hosted-zone-id "$zona"     --query "ResourceRecordSets[?Type=='CNAME' && Name=='${nombre}']|[0]" --output json 2>/dev/null)" || return 0
+  reg="$(aws route53 list-resource-record-sets --hosted-zone-id "$zona"     --query "ResourceRecordSets[?Type=='CNAME' && Name=='${nombre}.']|[0]" --output json 2>/dev/null)" || return 0
   [ -n "$reg" ] && [ "$reg" != "null" ] || return 0
   echo ">> Eliminando CNAME residual $nombre"
   aws route53 change-resource-record-sets --hosted-zone-id "$zona"     --change-batch "{\"Changes\":[{\"Action\":\"DELETE\",\"ResourceRecordSet\":$reg}]}" || true
