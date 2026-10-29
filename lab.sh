@@ -132,9 +132,10 @@ cmd_desplegar() { # c0|c1
   # --- C1: modelo completo ---
   # los espacios de nombres deben existir antes de crear el ConfigMap destinos.
   aplicar "$RAIZ/k8s/base/00-namespaces.yaml"
-  # grupos de registros que lee el servicio de auditoría con Live Tail (ZT_GRUPOS).
+  # grupo de registros que lee el servicio de auditoría con Live Tail (ZT_GRUPOS): los
+  # registros de acceso de VPC Lattice, únicos que esta versión del normalizador tipa.
   local arn_grupo="arn:aws:logs:$REGION:$CUENTA:log-group"
-  kubectl create configmap registros -n auditoria     --from-literal=ZT_GRUPOS="$arn_grupo:/zt-lab/lattice/acceso,$arn_grupo:/zt-lab/vpc/flujos,$arn_grupo:/aws/eks/$CLUSTER/cluster"     --dry-run=client -o yaml | kubectl apply -f -
+  kubectl create configmap registros -n auditoria     --from-literal=ZT_GRUPOS="$arn_grupo:/zt-lab/lattice/acceso"     --dry-run=client -o yaml | kubectl apply -f -
   # destinos temporal para que los pods arranquen antes de conocer los dominios.
   kubectl create configmap destinos -n tienda \
     --from-literal=CATALOGO_URL="http://catalogo.tienda.svc.cluster.local:8080" \

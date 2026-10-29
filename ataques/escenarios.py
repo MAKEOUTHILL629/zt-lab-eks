@@ -185,6 +185,11 @@ def ejecutar_e8(destinos, tasa=10, duracion_s=60):
             time.sleep(intervalo)
 
 
+def _duracion_s():
+    """Duración de E6/E7 en segundos; 60 min por defecto (ZT_DURACION_MIN la reduce)."""
+    return int(float(os.environ.get("ZT_DURACION_MIN", "60")) * 60)
+
+
 def main(argv):
     escenario = (argv[1] if len(argv) > 1 else "E6").upper()
     destinos = destinos_desde_entorno()
@@ -199,9 +204,9 @@ def main(argv):
     elif escenario == "E5":
         ejecutar_e5(destinos)
     elif escenario == "E6":
-        ejecutar_e6(destinos, int(argv[2]) if len(argv) > 2 else 7)
+        ejecutar_e6(destinos, int(argv[2]) if len(argv) > 2 else 7, duracion_s=_duracion_s())
     elif escenario == "E7":
-        ejecutar_e7(destinos)
+        ejecutar_e7(destinos, duracion_s=_duracion_s())
     elif escenario == "E8":
         ejecutar_e8(destinos)
     else:

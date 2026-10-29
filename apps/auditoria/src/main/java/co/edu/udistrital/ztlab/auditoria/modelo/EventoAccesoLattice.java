@@ -8,13 +8,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 /** Tipado del registro de acceso de VPC Lattice ({lst:evento}, sección 7.3.4). */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record EventoAccesoLattice(
-    long startTime, // marca de tiempo en milisegundos desde época (formato de VPC Lattice)
+    JsonNode startTime, // texto ISO-8601 (formato de VPC Lattice) o milisegundos desde época
     String sourceIpPort,
     String serviceArn,
     String requestMethod,
     String requestPath,
     int responseCode,
-    String authDeniedReason, // Service, Network, Identity o null
+    String authDeniedReason, // Service, Network, Identity; "-" o null si no hubo denegación
+    String failureReason, // p. ej. ClientAccessDenied en TLS passthrough; "-" si no hubo fallo
     String callerPrincipal,
     JsonNode callerPrincipalTags, // etiquetas de sesión de EKS Pod Identity
     long bytesSent,
@@ -22,25 +23,50 @@ public record EventoAccesoLattice(
     long duration) {
 
   public boolean denegado() {
-    return (authDeniedReason != null && !authDeniedReason.equals("null")) || responseCode == 403;
+    return presente(authDeniedReason) || presente(failureReason) || responseCode == 403;
   }
 
   /** Marca de tiempo del evento como Instant. */
   public Instant instante() {
-    return Instant.ofEpochMilli(startTime);
+    if (startTime != null && startTime.isTextual()) {
+      return Instant.parse(startTime.asText());
+    }
+    return Instant.ofEpochMilli(startTime == null ? 0 : startTime.asLong());
   }
 
   /** Identidad del origen a partir de las etiquetas de sesión; null si no hay. */
   public String principal() {
-    if (callerPrincipalTags == null || callerPrincipalTags.isMissingNode() || callerPrincipalTags.isNull()) {
-      return null; // se resuelve por la dirección IP de origen
+    if (callerPrincipalTags == null || !callerPrincipalTags.isObject()) {
+      return desdeRol(); // sin etiquetas de sesión: se usa el rol del llamante
     }
     String ns = callerPrincipalTags.path("kubernetes-namespace").asText("");
     String sa = callerPrincipalTags.path("kubernetes-service-account").asText("");
     if (ns.isEmpty() || sa.isEmpty()) {
-      return null;
+      return desdeRol();
     }
     return ns + "/" + sa;
+  }
+
+  private static boolean presente(String valor) {
+    return valor != null && !valor.isEmpty() && !valor.equals("-") && !valor.equals("null");
+  }
+
+  /**
+   * Los registros reales de VPC Lattice no incluyen las etiquetas de sesión: la identidad
+   * se toma del rol asumido por Pod Identity (arn:...:assumed-role/zt-lab-<servicio>/...).
+   * Si el llamante es anónimo devuelve null y se resuelve por la dirección IP de origen.
+   */
+  private String desdeRol() {
+    if (callerPrincipal == null) {
+      return null;
+    }
+    int i = callerPrincipal.indexOf("assumed-role/zt-lab-");
+    if (i < 0) {
+      return null;
+    }
+    String resto = callerPrincipal.substring(i + "assumed-role/zt-lab-".length());
+    int fin = resto.indexOf('/');
+    return "tienda/" + (fin < 0 ? resto : resto.substring(0, fin));
   }
 
   /** Dirección IP de origen (sin el puerto). */

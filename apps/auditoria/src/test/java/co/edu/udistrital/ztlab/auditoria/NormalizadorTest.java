@@ -52,4 +52,29 @@ class NormalizadorTest {
     EventoRed literal = n.aEventoRed(n.tiparLattice(sinEtiquetas("10.0.32.7")));
     assertEquals("ip:10.0.32.7", literal.principal());
   }
+
+  @Test
+  void p1b_registroRealDeLattice_fechaIsoRolYSinDenegacion() throws Exception {
+    String real = "{\"startTime\":\"2026-10-29T03:05:02Z\",\"sourceIpPort\":\"10.0.45.200:29821\","
+        + "\"serviceArn\":\"arn:aws:vpc-lattice:us-east-1:111122223333:service/svc-1\","
+        + "\"requestMethod\":\"GET\",\"requestPath\":\"/productos\",\"responseCode\":200,"
+        + "\"authDeniedReason\":\"-\",\"failureReason\":\"-\","
+        + "\"callerPrincipal\":\"arn:aws:sts::111122223333:assumed-role/zt-lab-portal/eks-zt-lab-portal-f8b\","
+        + "\"callerPrincipalTags\":\"-\",\"bytesSent\":10,\"bytesReceived\":20,\"duration\":9}";
+    EventoAccesoLattice e = n.tiparLattice(real);
+    assertEquals("tienda/portal", e.principal());
+    assertFalse(e.denegado());
+    assertEquals(java.time.Instant.parse("2026-10-29T03:05:02Z"), e.instante());
+  }
+
+  @Test
+  void p1c_denegacionTlsPassthroughSeDetectaPorFailureReason() throws Exception {
+    String denegado = "{\"startTime\":\"2026-10-29T03:05:06Z\",\"sourceIpPort\":\"10.0.18.125:1254\","
+        + "\"serviceArn\":\"arn:aws:vpc-lattice:us-east-1:111122223333:service/svc-2\","
+        + "\"authDeniedReason\":\"-\",\"failureReason\":\"ClientAccessDenied\","
+        + "\"callerPrincipalTags\":\"-\",\"bytesSent\":0,\"bytesReceived\":0,\"duration\":4}";
+    EventoAccesoLattice e = n.tiparLattice(denegado);
+    assertEquals(null, e.principal());
+    org.junit.jupiter.api.Assertions.assertTrue(e.denegado());
+  }
 }
